@@ -1,0 +1,1021 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE nta PUBLIC '-//Uppaal Team//DTD Flat System 1.1//EN' 'http://www.it.uu.se/research/group/darts/uppaal/flat-1_2.dtd'>
+<nta>
+	<declaration>// Place global declarations here.
+broadcast chan taskPublished;
+broadcast chan taskClaimed;
+
+const double pi = 3.14159;
+
+//PARAMETERS
+
+//CONFIG 1 - Respect the properties
+//Floor lenght (x) and height (y)
+const int X = 10, Y = 10;
+//robot fleet number
+const int MAX_R = 6;
+//max number of task at the same time
+const int MAX_T = 6;
+//max number of pod
+const int MAX_P = 12;
+//ENTRY POINT
+const int EPX = 9, EPY = 0;
+//DELIVERY POINT
+const int DPX = 9, DPY = 9;
+//µT for human operator
+const int meanH = 15;
+//σT for human operator
+const double devH = 0.15; 
+//time units for a robot to move 
+const int K = 1;
+//lamba delay before a robot claims the next task
+const int lambda = 1;
+//µT for task 
+const int meanT = 45;
+//σT for task 
+const double devT = 0.2; 
+
+
+//CONFIG 2 - Do not respect the properties
+//Floor lenght (x) and height (y)
+/*
+const int X = 12, Y = 9;
+//robot fleet number
+const int MAX_R = 6;
+//max number of task at the same time
+const int MAX_T = 9;
+//max number of pod
+const int MAX_P = 15;
+//ENTRY POINT
+const int EPX = 11, EPY = 0;
+//DELIVERY POINT
+const int DPX = 11, DPY = 8;
+//µT for human operator
+const int meanH = 5;
+//σT for human operator
+const double devH = 0.25; 
+//time units for a robot to move 
+const int K = 3;
+//lamba delay before a robot claims the next task
+const int lambda = 1;
+//µT for task 
+const int meanT = 70;
+//σT for task 
+const double devT = 0.12; 
+*/
+/*
+//CONFIG 3 - Respect the properties
+//Floor lenght (x) and height (y)
+const int X = 7, Y = 13;
+//robot fleet number
+const int MAX_R = 7;
+//max number of task at the same time
+const int MAX_T = 9;
+//max number of pod
+const int MAX_P = 16;
+//ENTRY POINT
+const int EPX = 0, EPY = 0;
+//DELIVERY POINT
+const int DPX = 6, DPY = 12;
+//µT for human operator
+const int meanH = 12;
+//σT for human operator
+const double devH = 0.25; 
+//time units for a robot to move 
+const int K = 2;
+//lamba delay before a robot claims the next task
+const int lambda = 2;
+//µT for task 
+const int meanT = 58;
+//σT for task 
+const double devT = 0.20; 
+*/
+/*
+//CONFIG 4 - Do not respect the properties
+//Floor lenght (x) and height (y)
+const int X = 14, Y = 9;
+//robot fleet number
+const int MAX_R = 5;
+//max number of task at the same time
+const int MAX_T = 9;
+//max number of pod
+const int MAX_P = 14;
+//ENTRY POINT
+const int EPX = 13, EPY = 0;
+//DELIVERY POINT
+const int DPX = 0, DPY = 8;
+//µT for human operator
+const int meanH = 15;
+//σT for human operator
+const double devH = 0.12; 
+//time units for a robot to move 
+const int K = 2;
+//lamba delay before a robot claims the next task
+const int lambda = 1;
+//µT for task 
+const int meanT = 100;
+//σT for task 
+const double devT = 0.15; 
+*/
+
+//DATA STRUCTURES
+
+//For initialising robots
+bool RobotReady = false;
+
+//Robot array, the indexes are associated with the robotID
+//R[robotID][0] is the podID associated to the robot (0 if it's waiting)
+int R[MAX_R];
+
+//Current task request of robots
+//for example REQUESTS[2][0] is the requested task by robot with index 2
+//and REQUESTS[2][0] is the state of the request (1 if accepted, 0 if not handled yet, -1 if refused)
+int REQUESTS[MAX_R][2];
+
+//Robots position - CONFIG 1
+//int ROBOT_POS[X][Y];
+int ROBOT_POS[X][Y] = {
+    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
+};
+
+/*
+//Robots position - CONFIG 2
+//int ROBOT_POS[X][Y];
+int ROBOT_POS[X][Y] = {
+    {0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {0, 0, 0, 0, 0, 0, 0, 0, 0}
+};
+*/
+/*
+//Robots position - CONFIG 3
+//int ROBOT_POS[X][Y];
+int ROBOT_POS[X][Y] = {
+    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
+};
+*/
+/*
+//Robots position - CONFIG 4
+//int ROBOT_POS[X][Y];
+int ROBOT_POS[X][Y] = {
+    {0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {0, 0, 0, 0, 0, 0, 0, 0, 0},
+    {0, 0, 0, 0, 0, 0, 0, 0, 0}
+};
+*/
+
+//Pods positions, POD_POS[podID-1][0] is the x coord of podID, POD_POS[podID-1][1] is the y coord of podID
+int POD_POS[MAX_P][2];
+
+//Pods currently available for a task:
+// podID assignable     and blocking the floor-&gt; FREE_PODS[podID -1] = 0;
+// podID not assignable and blocking the floor -&gt; FREE_PODS[podID -1] = 1;
+// podID not assignable and blocking the floor, since already assigned to a task, but not taken yet by a robot -&gt; FREE_PODS[podID -1] = 2;
+// podID not assignable but carried by a robot, so the floor is currently free -&gt; FREE_PODS[podID -1] = 3;
+int FREE_PODS[MAX_P];
+
+//Tasks generated
+// TASK_QUEUE[x][0] is the task id, TASK_QUEUE[x][1] represents the state of the requests (1 if at least one robot asked for it, 0 otherwise)
+int TASK_QUEUE[MAX_T][2];
+//indexes for FIFO policy
+int startQueue;
+int endQueue;
+
+//For Normal distribution using Box-Müller method
+double stdNormal() {
+	return sqrt(-2 * ln(1 - random(1))) * cos(2 * pi * random(1));
+}
+
+// Compute value from Normal Distribution with given mean and standard deviation
+// Constant standard deviation (variance)
+double Normal(int mean, double stdDev) {
+	return mean + stdDev * stdNormal();
+}
+</declaration>
+	<template>
+		<name>Robot</name>
+		<parameter>int robotIndex, int k</parameter>
+		<declaration>clock cRobot;
+
+//Current x coord
+int curX = EPX;
+//Current y coord
+int curY = EPY;
+//Current destination x coord
+int destX = EPX;
+//Current destination y coord
+int destY = EPY;
+//Pod currently carried, 0 if idle
+int podID = 0;
+int podX, podY; 
+//Human operator reaction time
+int timeH;
+
+int i = 0;
+
+//For robot movement
+int nextMove = 0;
+double random_move;
+
+
+//Count the number of no-moves possible
+int noMoves = 0;
+
+void newTaskNotification()
+{
+    if(REQUESTS[robotIndex-1][1] == -1 )
+    {
+    
+        i = startQueue;    
+        while( i % MAX_T == endQueue &amp;&amp; i &gt; startQueue &amp;&amp; (TASK_QUEUE[i][0] == 0 || TASK_QUEUE[i][1] == 1) )
+        {
+            i++;
+        }
+        if( TASK_QUEUE[i % MAX_T][0] != 0 &amp;&amp; TASK_QUEUE[i % MAX_T][1] != 1 ){
+            REQUESTS[robotIndex-1][0] = TASK_QUEUE[i % MAX_T][0];
+            TASK_QUEUE[i % MAX_T][1] = 1;
+            REQUESTS[robotIndex-1][1] = 0;
+        }
+    }
+}
+
+void takeTask()
+{ 
+     //SET POD POSITION AS CURRENT DESTINATION
+     destX = POD_POS[podID - 1][0];
+     destY = POD_POS[podID - 1][1];
+
+
+     //ASSIGN POD TO ROBOT ITSELF
+     R[robotIndex-1] = podID; 
+
+     //REMOVE REQUEST
+     REQUESTS[robotIndex-1][1] = 0;
+     REQUESTS[robotIndex-1][1] = -1;
+}
+
+//TO CHECK BEFORE A MOVEMENT IF THE ROBOT WANT TO VISIT A CELL CURRENTLY OCCUPIED BY A POD
+bool freeFromPods(int x, int y)
+{
+    int i = 0;
+    //SCAN THE POD LIST BY INDEX
+    for(i = 0; i&lt; MAX_P; i++)
+    {
+        //IF THERE'S A POD WITH THE SAME X COORD, CHECK ALSO Y
+        if(POD_POS[i][0] == x)
+        {    
+            if(POD_POS[i][1] == y)
+            {
+                //CHECK IF THE POD IS CURRENTLY IN THE CELL OR IS CARRIED BY ANOTHER ROBOT
+                if(FREE_PODS[i] != 3)
+                {
+                    //IN THIS CASE THE FLOOR IS OCCUPIED
+                    return false;
+                }
+                else
+                {
+                    //THE POD IS "AWAY" SO THE FLOOR IS FREE
+                    return true;
+                }
+            }
+        }
+        
+    }
+    //IF WE HA VE REACHED THE END OF THE CYCLE, THE CELL IS FREE FROM PODS
+    return true;
+}
+
+//MOVEMENT FUNCTION FOR "FREE" ROBOTS
+void move()
+{
+    int deltaX, deltaY;
+    if(R[robotIndex-1] == 0)
+    {
+        //do nothing (waiting)
+    }
+    else 
+    {
+        //the robot has a destination to reach
+        deltaX = destX - curX;
+        deltaY = destY - curY;
+    }
+
+    if(deltaX &gt; 0 &amp;&amp; (ROBOT_POS[curX+1][curY] == 0 || (curX+1 == EPX &amp;&amp; curY == EPY))) 
+    //if(deltaX &gt; 0) // must go down
+    {
+        ROBOT_POS[curX][curY] = 0;
+        curX++;
+        ROBOT_POS[curX][curY] = robotIndex;
+
+    }
+
+    //else if(deltaX &lt; 0) // must go up
+     else if(deltaX &lt; 0 &amp;&amp; (ROBOT_POS[curX-1][curY] == 0 || (curX-1 == EPX &amp;&amp; curY == EPY))) 
+    {
+        ROBOT_POS[curX][curY] = 0;
+        curX--;
+        ROBOT_POS[curX][curY] = robotIndex;
+
+    }
+
+    //else if(deltaY &gt; 0)  // must go right
+    else if(deltaY &gt; 0 &amp;&amp; (ROBOT_POS[curX][curY+1] == 0 || (curX == EPX &amp;&amp; curY+1 == EPY)))
+    {
+        ROBOT_POS[curX][curY] = 0;
+        curY++;
+        ROBOT_POS[curX][curY] = robotIndex;
+
+    }
+    //else if(deltaY &lt; 0) // must go left
+    else if(deltaY &lt; 0 &amp;&amp; (ROBOT_POS[curX][curY-1] == 0 || (curX == EPX &amp;&amp; curY-1 == EPY)))
+    {
+        ROBOT_POS[curX][curY] = 0;
+        curY--;
+        ROBOT_POS[curX][curY] = robotIndex;
+
+    }
+    else 
+    //IN THIS CASE THE ROBOT CANNOT PERFORM ANY MOVE TO GET CLOSER TO ITS DESTINATION, GO BACK OF ONE ( X or Y )
+    {
+         noMoves++;
+         if( curX &lt; X-1 &amp;&amp; ROBOT_POS[curX+1][curY] == 0 )
+         {  
+            ROBOT_POS[curX][curY] = 0;
+            curX++;
+            ROBOT_POS[curX][curY] = robotIndex;  
+         }
+         else if( curX &gt; 0 &amp;&amp; ROBOT_POS[curX-1][curY] == 0 )
+         {
+            ROBOT_POS[curX][curY] = 0;
+            curX--;
+            ROBOT_POS[curX][curY] = robotIndex;
+         }
+         else if( curY &lt; Y-1 &amp;&amp; ROBOT_POS[curX][curY+1] == 0 )
+         {  
+            ROBOT_POS[curX][curY] = 0;
+            curY++;
+            ROBOT_POS[curX][curY] = robotIndex;  
+         }
+         else if( curY &gt; 0 &amp;&amp; ROBOT_POS[curX][curY-1] == 0 )
+         {
+            ROBOT_POS[curX][curY] = 0;
+            curY--;
+            ROBOT_POS[curX][curY] = robotIndex;
+         }
+    }
+    
+}
+
+//MOVEMENT FUNCTION FOR ROBOTS CARRYING A POD
+void movePod()
+{
+    int deltaX, deltaY;
+    if(R[robotIndex-1] == 0)
+    {
+        //do nothing (waiting)
+    }
+    else 
+    {
+        //the robot has a destination to reach
+        deltaX = destX - curX;
+        deltaY = destY - curY;
+    }
+
+    if(deltaX &gt; 0 &amp;&amp; freeFromPods(curX+1, curY) &amp;&amp; (ROBOT_POS[curX+1][curY] == 0 || (curX+1 == EPX &amp;&amp; curY == EPY))) 
+    //if(deltaX &gt; 0) // must go down
+    {
+        ROBOT_POS[curX][curY] = 0;
+        curX++;
+        ROBOT_POS[curX][curY] = robotIndex;
+    }
+
+
+    //else if(deltaX &lt; 0) // must go up
+     else if(deltaX &lt; 0 &amp;&amp; freeFromPods(curX-1, curY)&amp;&amp; (ROBOT_POS[curX-1][curY] == 0 || (curX-1 == EPX &amp;&amp; curY == EPY))) 
+    {
+        ROBOT_POS[curX][curY] = 0;
+        curX--;
+        ROBOT_POS[curX][curY] = robotIndex;
+    }
+
+    //else if(deltaY &gt; 0)  // must go right
+    else if(deltaY &gt; 0 &amp;&amp; freeFromPods(curX, curY+1)&amp;&amp; (ROBOT_POS[curX][curY+1] == 0 || (curX == EPX &amp;&amp; curY+1 == EPY)))
+    {
+        ROBOT_POS[curX][curY] = 0;
+        curY++;
+        ROBOT_POS[curX][curY] = robotIndex;
+    }
+    //else if(deltaY &lt; 0) // must go left
+    else if(deltaY &lt; 0 &amp;&amp; freeFromPods(curX, curY-1)&amp;&amp;  (ROBOT_POS[curX][curY-1] == 0 || (curX == EPX &amp;&amp; curY-1 == EPY)))
+    {
+        ROBOT_POS[curX][curY] = 0;
+        curY--;
+        ROBOT_POS[curX][curY] = robotIndex;
+    }
+    else 
+    //IN THIS CASE THE ROBOT CANNOT PERFORM ANY MOVE TO GET CLOSER TO ITS DESTINATION, GO BACK OF ONE ( X or Y )
+    {
+         noMoves++;
+         if(curX &lt; X-1 &amp;&amp; ROBOT_POS[curX+1][curY] == 0 &amp;&amp; freeFromPods(curX+1, curY))
+         {  
+            ROBOT_POS[curX][curY] = 0;
+            curX++;
+            ROBOT_POS[curX][curY] = robotIndex;  
+         }
+         else if(curX &gt; 0 &amp;&amp; ROBOT_POS[curX-1][curY] == 0 &amp;&amp; freeFromPods(curX-1, curY))
+         {
+            ROBOT_POS[curX][curY] = 0;
+            curX--;
+            ROBOT_POS[curX][curY] = robotIndex;
+         }
+         else if(curY &lt; Y-1 &amp;&amp; ROBOT_POS[curX][curY+1] == 0 &amp;&amp; freeFromPods(curX, curY+1))
+         {  
+            ROBOT_POS[curX][curY] = 0;
+            curY++;
+            ROBOT_POS[curX][curY] = robotIndex;  
+         }
+         else if(curY &gt; 0 &amp;&amp; ROBOT_POS[curX][curY-1] == 0 &amp;&amp; freeFromPods(curX, curY-1) )
+         {
+            ROBOT_POS[curX][curY] = 0;
+            curY--;
+            ROBOT_POS[curX][curY] = robotIndex;
+         }
+    }
+}
+
+
+void checkRequestStatus()
+{
+    if(REQUESTS[robotIndex-1][1] == 1)
+    {
+        podID = REQUESTS[robotIndex-1][0];
+    }
+}
+
+void liftPod()
+{
+    //SET THE POD AS "NOT ASSIGNABLE, BUT NOT BLOCKING THE FLOOR" AS THE ROBOT IS CARRYING IT
+    FREE_PODS[podID -1] = 3;    
+}
+
+void initHumanReaction()
+{
+    timeH = fint(Normal(meanH, devH));
+}
+
+void releasePod()
+{
+    //UPDATE ROBOT ITSELF
+    R[robotIndex-1] = 0;
+    // UPDATE OF THE POD STATE
+    FREE_PODS[podID - 1] = 0;
+    //UPDATE podID local var
+    podID = 0;
+
+    destX = EPX;
+    destY = EPY;
+    
+}</declaration>
+		<location id="id0" x="-136" y="-187">
+			<name x="-153" y="-153">Ready</name>
+			<label kind="exponentialrate" x="-153" y="-170">lambda</label>
+		</location>
+		<location id="id1" x="76" y="-42">
+			<name x="-34" y="-34">Task_accepted</name>
+			<label kind="exponentialrate" x="85" y="-25">1</label>
+		</location>
+		<location id="id2" x="34" y="212">
+			<name x="59" y="204">Pod_position_reached</name>
+			<label kind="exponentialrate" x="51" y="178">1</label>
+		</location>
+		<location id="id3" x="-289" y="212">
+			<name x="-459" y="212">Delivery_point_reached</name>
+			<label kind="invariant" x="-416" y="238">cRobot &lt;= timeH</label>
+		</location>
+		<location id="id4" x="-340" y="-51">
+			<name x="-314" y="-59">Returning_Pod</name>
+			<label kind="exponentialrate" x="-357" y="-34">1</label>
+		</location>
+		<location id="id5" x="-136" y="-331">
+			<name x="-144" y="-365">Idle</name>
+			<label kind="exponentialrate" x="-119" y="-357">1</label>
+		</location>
+		<init ref="id5"/>
+		<transition>
+			<source ref="id5"/>
+			<target ref="id0"/>
+			<label kind="guard" x="-127" y="-289">RobotReady</label>
+		</transition>
+		<transition>
+			<source ref="id0"/>
+			<target ref="id0"/>
+			<label kind="guard" x="85" y="-187">podID == 0</label>
+			<label kind="assignment" x="51" y="-204">checkRequestStatus()</label>
+			<nail x="51" y="-204"/>
+			<nail x="51" y="-161"/>
+		</transition>
+		<transition>
+			<source ref="id4"/>
+			<target ref="id0"/>
+			<label kind="guard" x="-441" y="-136">curX == destX &amp;&amp; curY == destY</label>
+			<label kind="assignment" x="-382" y="-119">releasePod()</label>
+		</transition>
+		<transition>
+			<source ref="id4"/>
+			<target ref="id4"/>
+			<label kind="guard" x="-544" y="-68">cRobot &gt;= k</label>
+			<label kind="assignment" x="-603" y="-51">movePod(),cRobot = 0</label>
+			<nail x="-425" y="-18"/>
+			<nail x="-425" y="-77"/>
+		</transition>
+		<transition>
+			<source ref="id3"/>
+			<target ref="id4"/>
+			<label kind="guard" x="-229" y="51">cRobot == timeH</label>
+			<label kind="assignment" x="-280" y="76">cRobot = 0,
+destX = POD_POS[podID - 1][0],
+destY = POD_POS[podID - 1][1]</label>
+		</transition>
+		<transition>
+			<source ref="id2"/>
+			<target ref="id2"/>
+			<label kind="guard" x="8" y="289">cRobot &gt;= k</label>
+			<label kind="assignment" x="-34" y="306">movePod(),cRobot = 0</label>
+			<nail x="59" y="280"/>
+			<nail x="17" y="280"/>
+		</transition>
+		<transition>
+			<source ref="id2"/>
+			<target ref="id3"/>
+			<label kind="guard" x="-221" y="221">curX == destX &amp;&amp; curY == destY</label>
+			<label kind="assignment" x="-212" y="238">cRobot = 0, initHumanReaction()</label>
+		</transition>
+		<transition>
+			<source ref="id1"/>
+			<target ref="id2"/>
+			<label kind="guard" x="93" y="68">curX == destX &amp;&amp; curY == destY</label>
+			<label kind="assignment" x="93" y="85">destX = DPX, destY = DPY, liftPod()</label>
+		</transition>
+		<transition>
+			<source ref="id0"/>
+			<target ref="id1"/>
+			<label kind="guard" x="-111" y="-119">podID != 0</label>
+			<label kind="assignment" x="-153" y="-102">cRobot = 0, takeTask()</label>
+		</transition>
+		<transition>
+			<source ref="id0"/>
+			<target ref="id0"/>
+			<label kind="synchronisation" x="-450" y="-187">taskPublished?</label>
+			<label kind="assignment" x="-476" y="-204">newTaskNotification()</label>
+			<nail x="-331" y="-161"/>
+			<nail x="-331" y="-195"/>
+		</transition>
+		<transition>
+			<source ref="id1"/>
+			<target ref="id1"/>
+			<label kind="guard" x="178" y="-59">cRobot &gt;= k</label>
+			<label kind="assignment" x="170" y="-42">move(),cRobot = 0</label>
+			<nail x="153" y="-8"/>
+			<nail x="153" y="-68"/>
+		</transition>
+	</template>
+	<template>
+		<name x="5" y="5">Controller</name>
+		<declaration>clock cPublish;
+
+//current number of tasks in the TASK_QUEUE
+int nTasks = 0;
+int maxP = MAX_P;
+int overflowCounter = 0;
+
+int maxT = MAX_T;
+
+//for stopping the pod selection after too many checks
+int maxTry = 0;
+
+//Delay between the spawn of two tasks
+int timeT;
+
+//When starting all the pods must be assignable 
+void initPodList(){
+    int l = 0;
+    startQueue = 0;
+    endQueue = 0;
+
+    for(l = 0; l&lt; MAX_P; l++)
+    {
+        FREE_PODS[l] = 0;
+    }
+
+    //PODS_POSITIONS
+    
+    //CONFIG 1 - THESE POSITIONS ARE THE SAME OF THE LAST 2 ROWS AT PAGE 2 OF "FM_Homework_2021.pdf"
+    POD_POS[0][0] = 0;
+    POD_POS[0][1] = 1;
+
+    POD_POS[1][0] = 1;
+    POD_POS[1][1] = 1;
+
+    POD_POS[2][0] = 2;
+    POD_POS[2][1] = 1;
+
+    POD_POS[3][0] = 3;
+    POD_POS[3][1] = 1;
+
+    POD_POS[4][0] = 4;
+    POD_POS[4][1] = 1;
+
+    POD_POS[5][0] = 5;
+    POD_POS[5][1] = 1;
+
+    POD_POS[6][0] = 0;
+    POD_POS[6][1] = 3;
+
+    POD_POS[7][0] = 1;
+    POD_POS[7][1] = 3;
+
+    POD_POS[8][0] = 2;
+    POD_POS[8][1] = 3;
+
+    POD_POS[9][0] = 3;
+    POD_POS[9][1] = 3;
+
+    POD_POS[10][0] = 4;
+    POD_POS[10][1] = 3;
+
+    POD_POS[11][0] = 5;
+    POD_POS[11][1] = 3;
+    
+    /*
+    //CONFIG 2 
+    POD_POS[0][0] = 0;
+    POD_POS[0][1] = 1;
+
+    POD_POS[1][0] = 1;
+    POD_POS[1][1] = 1;
+
+    POD_POS[2][0] = 2;
+    POD_POS[2][1] = 1;
+
+    POD_POS[3][0] = 3;
+    POD_POS[3][1] = 1;
+
+    POD_POS[4][0] = 4;
+    POD_POS[4][1] = 1;
+
+
+    POD_POS[5][0] = 0;
+    POD_POS[5][1] = 3;
+
+    POD_POS[6][0] = 1;
+    POD_POS[6][1] = 3;
+
+    POD_POS[7][0] = 2;
+    POD_POS[7][1] = 3;
+
+    POD_POS[8][0] = 3;
+    POD_POS[8][1] = 3;
+
+    POD_POS[9][0] = 4;
+    POD_POS[9][1] = 3;
+
+
+    POD_POS[10][0] = 0;
+    POD_POS[10][1] = 5;
+
+    POD_POS[11][0] = 1;
+    POD_POS[11][1] = 5;
+
+    POD_POS[12][0] = 2;
+    POD_POS[12][1] = 5;
+
+    POD_POS[13][0] = 3;
+    POD_POS[13][1] = 5;
+
+    POD_POS[14][0] = 4;
+    POD_POS[14][1] = 5;
+    */
+    /*
+    //CONFIG 3
+    POD_POS[0][0] = 2;
+    POD_POS[0][1] = 1;
+
+    POD_POS[1][0] = 3;
+    POD_POS[1][1] = 1;
+
+    POD_POS[2][0] = 4;
+    POD_POS[2][1] = 1;
+
+    POD_POS[3][0] = 5;
+    POD_POS[3][1] = 1;
+
+
+    POD_POS[4][0] = 2;
+    POD_POS[4][1] = 4;
+
+    POD_POS[5][0] = 3;
+    POD_POS[5][1] = 4;
+
+    POD_POS[6][0] = 4;
+    POD_POS[6][1] = 4;
+
+    POD_POS[7][0] = 5;
+    POD_POS[7][1] = 4;
+
+
+    POD_POS[8][0] = 2;
+    POD_POS[8][1] = 7;
+
+    POD_POS[9][0] = 3;
+    POD_POS[9][1] = 7;
+
+    POD_POS[10][0] = 4;
+    POD_POS[10][1] = 7;
+
+    POD_POS[11][0] = 5;
+    POD_POS[11][1] = 7;
+
+
+    POD_POS[12][0] = 2;
+    POD_POS[12][1] = 10;
+
+    POD_POS[13][0] = 3;
+    POD_POS[13][1] = 10;
+
+    POD_POS[14][0] = 4;
+    POD_POS[14][1] = 10;
+
+    POD_POS[14][0] = 5;
+    POD_POS[14][1] = 10;
+    */
+    /*
+    //CONFIG 4
+    POD_POS[0][0] = 0;
+    POD_POS[0][1] = 2;
+
+    POD_POS[1][0] = 1;
+    POD_POS[1][1] = 2;
+
+    POD_POS[2][0] = 2;
+    POD_POS[2][1] = 2;
+
+    POD_POS[3][0] = 3;
+    POD_POS[3][1] = 2;
+
+    POD_POS[4][0] = 6;
+    POD_POS[4][1] = 2;
+
+    POD_POS[5][0] = 7;
+    POD_POS[5][1] = 2;
+
+    POD_POS[6][0] = 8;
+    POD_POS[6][1] = 2;
+
+
+    POD_POS[7][0] = 0;
+    POD_POS[7][1] = 4;
+
+    POD_POS[8][0] = 1;
+    POD_POS[8][1] = 4;
+
+    POD_POS[9][0] = 2;
+    POD_POS[9][1] = 4;
+
+    POD_POS[10][0] = 3;
+    POD_POS[10][1] = 4;
+
+    POD_POS[11][0] = 6;
+    POD_POS[11][1] = 4;
+
+    POD_POS[12][0] = 7;
+    POD_POS[12][1] = 4;
+
+    POD_POS[13][0] = 8;
+    POD_POS[13][1] = 4;
+    */
+}
+
+void initRequestsList()
+{
+    int l = 0;
+
+    for(l = 0; l&lt; MAX_R; l++)
+    {
+        REQUESTS[l][1] = -1;
+    }
+}
+
+void initDelay()
+{
+    timeT = fint(Normal(meanT, devT));
+}
+
+void initRobot()
+{
+    RobotReady = true;
+}
+
+void publishTask()
+{
+    if(nTasks &lt; MAX_T)
+    {
+        int randomPOD = 0;
+        int k = 0;
+        
+        //SCAN THE POD LIST
+        int j = 0;
+        for(j=0; j&lt;MAX_P; j++)
+        {
+            //IF THE POD IS NOT ASSIGNED TO A TASK
+            if(FREE_PODS[j] == 0 || FREE_PODS[j] == 1)
+            {   //IF THE POD IS BLOCKED BY A ROBOT IT IS NOT ASSIGNABLE
+                if(ROBOT_POS[POD_POS[j][0]][POD_POS[j][1]] != 0){
+                    FREE_PODS[j] = 1;
+                }
+                //IN THIS CASE IT IS ASSIGNABLE
+                else
+                {
+                    FREE_PODS[j] = 0;
+                }   
+            }
+        }
+        //CHOOSE RANDOMLY UNTIL ONE FREE FOUND
+        maxTry = 0;
+        do
+        {
+            randomPOD = fint(floor(random(maxP)));
+            maxTry ++;
+        }while(FREE_PODS[randomPOD]!= 0 &amp;&amp; maxTry &lt; (200 * MAX_P) ); 
+      
+        //There must be an available pod for the task
+        if(FREE_PODS[randomPOD]== 0)
+        {
+            //"randomPOD+1" IS NOW THE podID CHOOSEN
+            // UPDATE OF THE POD STATE
+            FREE_PODS[randomPOD] = 2;
+            //UPDATE OF THE TASK QUEUE
+            TASK_QUEUE[endQueue][0] = randomPOD + 1;
+            TASK_QUEUE[endQueue][1] = 0;
+            //INCREMENT endQueue
+            //if endQueue is the last cell of the array reset it to 0
+            if(endQueue == (MAX_T -1)){
+                endQueue = 0;
+            }
+            else{
+                endQueue ++;
+            }
+
+            nTasks = nTasks + 1;
+        }
+        
+        
+    }
+    //IN THIS CASE THE QUEUE OF TASK IS ALREADY FULL
+    else
+    {
+        overflowCounter = overflowCounter + 1;
+    }
+    //generate a new value for the wait of the next task
+    initDelay();
+}
+
+void handleRequests()
+{
+    int j = 0;
+    for(j=0; j&lt;MAX_R; j++)
+    {
+        if(REQUESTS[j][1] == 0)
+        {
+            int i = 0;
+            while(i &lt; MAX_T &amp;&amp; TASK_QUEUE[i][0] != REQUESTS[j][0]){
+                i++;
+            }
+
+            if(i &gt;= MAX_T)
+            {
+                REQUESTS[j][1] = -1; 
+            }
+        
+            if(REQUESTS[j][0] != 0 &amp;&amp; REQUESTS[j][1] == 0 &amp;&amp; i &lt; MAX_T )
+            {
+                //THE REQUEST IS ACCEPTED
+                if(TASK_QUEUE[i][0] &gt; 0)
+                {
+                   TASK_QUEUE[i][0] = 0;
+                   REQUESTS[j][1] = 1; 
+                   //UPDATE THE START OF THE LIST
+                   //if startQueue is the last cell of the array reset it to 0
+                   if(startQueue == (MAX_T -1)){
+                       startQueue = 0;
+                   }
+                   else{
+                       startQueue ++;
+                   }
+                   //DECREASE THE CURRENT TASKS COUNTER
+                   nTasks--;
+                }
+                //THE REQUEST IS REFUSED
+                else
+                {
+                   REQUESTS[j][1] = -1; 
+                }
+           
+            }
+        }
+    }
+}
+
+</declaration>
+		<location id="id6" x="-493" y="-8">
+			<name x="-501" y="9">idle</name>
+			<label kind="exponentialrate" x="-503" y="26">1</label>
+		</location>
+		<location id="id7" x="-17" y="-8">
+			<name x="-127" y="9">POD_LIST_INIT</name>
+			<label kind="invariant" x="-119" y="25">cPublish &lt;= timeT</label>
+		</location>
+		<init ref="id6"/>
+		<transition>
+			<source ref="id7"/>
+			<target ref="id7"/>
+			<label kind="assignment" x="119" y="9">handleRequests()</label>
+			<nail x="119" y="-24"/>
+			<nail x="102" y="77"/>
+		</transition>
+		<transition>
+			<source ref="id7"/>
+			<target ref="id7"/>
+			<label kind="guard" x="-59" y="-211">cPublish == timeT</label>
+			<label kind="synchronisation" x="-59" y="-194">taskPublished!</label>
+			<label kind="assignment" x="-93" y="-177">publishTask(), cPublish = 0</label>
+			<nail x="-94" y="-134"/>
+			<nail x="59" y="-134"/>
+		</transition>
+		<transition>
+			<source ref="id6"/>
+			<target ref="id7"/>
+			<label kind="assignment" x="-433" y="-34">initPodList(), initRequestsList(), initDelay(), initRobot()</label>
+		</transition>
+	</template>
+	<system>// Place template instantiations here.
+controller = Controller();
+robot0 = Robot(1,K);
+robot1 = Robot(2,K);
+robot2 = Robot(3, K);
+robot3 = Robot(4,K);
+robot4 = Robot(5,K);
+robot5 = Robot(6,K);
+robot6 = Robot(7,K);
+// List one or more processes to be composed into a system.
+system controller, robot0, robot1, robot2, robot3, robot4, robot5/*, robot6*/;
+    </system>
+	<queries>
+		<query>
+			<formula>Pr[&lt;=5000;1000](&lt;&gt;robot0.Returning_Pod)</formula>
+			<comment>Range of probabilities for one robot (robot0 in particular), to reach the return_pod state, checked with 100 runs</comment>
+		</query>
+		<query>
+			<formula>Pr[&lt;=5000;1000](&lt;&gt; controller.maxT == controller.nTasks)</formula>
+			<comment>Range of probabilities of reaching the max number of tasks possible in the queue, checked with 50 runs</comment>
+		</query>
+		<query>
+			<formula>Pr[&lt;=5000;1000](&lt;&gt;controller.overflowCounter &gt; 0)</formula>
+			<comment>Range of probabilities of exceeding the number of tasks in the queue</comment>
+		</query>
+	</queries>
+</nta>
